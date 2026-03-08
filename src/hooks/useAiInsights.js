@@ -1,0 +1,1 @@
+// useAiInsights hook
