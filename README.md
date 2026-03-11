@@ -59,10 +59,46 @@ package.json
    ```bash
    npm install
    ```
-2. Start development server:
+2. Create environment file for Jira credentials:
+  ```bash
+  copy .env.example .env
+  ```
+3. Start backend API server:
+  ```bash
+  npm run start
+  ```
+4. Start frontend development server:
    ```bash
    npm run dev
    ```
+
+## Environment Variables
+Configure values in `.env`:
+
+```env
+BACKEND_PORT=4000
+JIRA_BASE_URL=https://your-domain.atlassian.net
+JIRA_EMAIL=your-email@example.com
+JIRA_API_TOKEN=your-jira-api-token
+JIRA_STORY_POINTS_FIELD=customfield_10016
+JIRA_CHANNEL_LABEL_PREFIX=channel-
+JIRA_TEAM_LABEL_PREFIX=team-
+JIRA_TRAIN_LABEL_PREFIX=train-
+REACT_APP_JIRA_PROJECT_KEY=TM
+```
+
+## Jira Integration
+- Backend endpoint: `/api/jira/issues?projectKey=TM`
+- Health check: `/api/health`
+- Jira credentials are read only on backend from `.env`.
+- Channel, Team, and Train are parsed from Jira labels.
+- Label examples: `channel-aa`, `team-aa`, `train-aa`.
+- `JIRA_STORY_POINTS_FIELD` remains configurable for story points.
+
+## Run Notes
+- Run backend and frontend in separate terminals.
+- Keep backend on port `4000` using `BACKEND_PORT`.
+- Frontend uses `react-scripts` and proxies `/api` calls to backend via `package.json` proxy.
 
 ## Customization
 - Update placeholder files with actual implementation.

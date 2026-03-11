@@ -51,6 +51,14 @@
 	background: #232a34;
 	color: #fff;
 }
+.dashboard-input {
+	padding: 8px 12px;
+	border-radius: 6px;
+	border: 1px solid #2e3748;
+	background: #232a34;
+	color: #fff;
+	min-width: 180px;
+}
 .dashboard-kpis {
 	display: flex;
 	gap: 24px;
@@ -111,6 +119,15 @@
 	display: flex;
 	gap: 24px;
 }
+.dashboard-table-panel {
+	flex: 1;
+}
+.dashboard-section-title {
+	font-size: 1.25rem;
+	font-weight: bold;
+	color: #fff;
+	margin: 0 0 12px 0;
+}
 .msr-table {
 	background: #232a34;
 	border-radius: 8px;
@@ -130,4 +147,12 @@
 }
 .msr-table tr:nth-child(even) {
 	background: #232a34;
+}
+.msr-table-message {
+	color: #a0aec0;
+	text-align: center;
+	padding: 16px;
+}
+.msr-table-error {
+	color: #fca5a5;
 }
