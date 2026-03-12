@@ -85,6 +85,8 @@ JIRA_CHANNEL_LABEL_PREFIX=channel-
 JIRA_TEAM_LABEL_PREFIX=team-
 JIRA_TRAIN_LABEL_PREFIX=train-
 REACT_APP_JIRA_PROJECT_KEY=TM
+OPENAI_API_KEY=your-openai-api-key
+OPENAI_MODEL=gpt-4.1-mini
 ```
 
 ## Jira Integration
@@ -94,6 +96,8 @@ REACT_APP_JIRA_PROJECT_KEY=TM
 - Channel, Team, and Train are parsed from Jira labels.
 - Label examples: `channel-aa`, `team-aa`, `train-aa`.
 - `JIRA_STORY_POINTS_FIELD` remains configurable for story points.
+- AI Insights endpoint: `/api/ai/insights` (uses OpenAI via backend only).
+- Set `OPENAI_API_KEY` in `.env` to enable real AI-generated summaries.
 
 ## Run Notes
 - Run backend and frontend in separate terminals.

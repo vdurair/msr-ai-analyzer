@@ -1,5 +1,6 @@
 const express = require("express");
 const axios = require("axios");
+const OpenAI = require("openai");
 require("dotenv").config();
 
 const app = express();
@@ -11,6 +12,26 @@ const jiraStoryPointsField = process.env.JIRA_STORY_POINTS_FIELD || "customfield
 const jiraChannelLabelPrefix = (process.env.JIRA_CHANNEL_LABEL_PREFIX || "channel-").toLowerCase();
 const jiraTeamLabelPrefix = (process.env.JIRA_TEAM_LABEL_PREFIX || "team-").toLowerCase();
 const jiraTrainLabelPrefix = (process.env.JIRA_TRAIN_LABEL_PREFIX || "train-").toLowerCase();
+const openAiApiKey = process.env.OPENAI_API_KEY;
+const openAiModel = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const openAiClient = openAiApiKey ? new OpenAI({ apiKey: openAiApiKey }) : null;
+
+const buildFallbackInsight = ({ projectKey, filters, kpis, rows }) => {
+	const safeRows = Array.isArray(rows) ? rows : [];
+	const doneCount = safeRows.filter((row) => (row.status || "").toLowerCase() === "done").length;
+	const inProgressCount = safeRows.filter((row) => (row.status || "").toLowerCase().includes("progress")).length;
+	const total = safeRows.length;
+	const velocity = kpis?.velocity ?? 0;
+	const reliability = kpis?.commitmentReliability ?? "0 %";
+	const spillover = kpis?.spillover ?? "0 %";
+	const scope = [`channel=${filters?.channel || "All"}`, `team=${filters?.team || "All"}`, `train=${filters?.train || "All"}`].join(", ");
+
+	return [
+		`Summary: Project ${projectKey} (${scope}) has ${total} tracked issues with ${doneCount} Done and ${inProgressCount} In Progress.`,
+		`Risks: Spillover is ${spillover} and commitment reliability is ${reliability}; unresolved in-progress work may impact next sprint carryover.`,
+		`Actions: Prioritize closure of top in-progress items, rebalance ownership across assignees, and review scope against current velocity (${velocity}).`,
+	].join(" ");
+};
 
 app.use(express.json());
 
@@ -52,7 +73,7 @@ app.get("/api/jira/issues", async (req, res) => {
 		const requestBody = {
 			jql: `project=${projectKey} ORDER BY updated DESC`,
 			maxResults,
-			fields: ["summary", "status", "assignee", "labels", jiraStoryPointsField],
+			fields: ["summary", "status", "assignee", "issuetype", "labels", jiraStoryPointsField],
 		};
 
 		let response;
@@ -100,6 +121,7 @@ app.get("/api/jira/issues", async (req, res) => {
 				id: issue.id,
 				key: issue.key,
 				story: fields.summary || issue.key,
+				issueType: fields.issuetype?.name || "Other",
 				status: fields.status?.name || "Unknown",
 				points: Number.isFinite(storyPoints) ? storyPoints : 0,
 				assignee: fields.assignee?.displayName || "Unassigned",
@@ -117,6 +139,79 @@ app.get("/api/jira/issues", async (req, res) => {
 		return res.status(statusCode).json({
 			error: "Failed to fetch Jira issues",
 			details,
+		});
+	}
+});
+
+app.post("/api/ai/insights", async (req, res) => {
+	const { projectKey, filters, kpis, rows } = req.body || {};
+
+	if (!openAiClient) {
+		return res.status(500).json({
+			error: "AI is not configured. Set OPENAI_API_KEY in .env.",
+		});
+	}
+
+	if (!projectKey) {
+		return res.status(400).json({ error: "Missing projectKey in request body." });
+	}
+
+	const safeRows = Array.isArray(rows) ? rows.slice(0, 15) : [];
+
+	const promptPayload = {
+		projectKey,
+		filters: filters || {},
+		kpis: kpis || {},
+		issueCount: safeRows.length,
+		sampleIssues: safeRows.map((row) => ({
+			story: row.story,
+			status: row.status,
+			points: row.points,
+			assignee: row.assignee,
+			channel: row.channel,
+			team: row.team,
+			train: row.train,
+		})),
+	};
+
+	try {
+		const completion = await openAiClient.chat.completions.create({
+			model: openAiModel,
+			temperature: 0.3,
+			max_tokens: 220,
+			messages: [
+				{
+					role: "system",
+					content:
+						"You are an agile metrics analyst. Return a concise MSR insight in plain English with exactly 3 short parts: Summary, Risks, Actions.",
+				},
+				{
+					role: "user",
+					content: `Generate AI insights from this dashboard data: ${JSON.stringify(promptPayload)}`,
+				},
+			],
+		});
+
+		const summary = completion.choices?.[0]?.message?.content?.trim();
+		if (!summary) {
+			return res.status(502).json({ error: "OpenAI returned an empty insight." });
+		}
+
+		return res.json({ summary, model: openAiModel });
+	} catch (error) {
+		const statusCode = error.status || error.response?.status;
+		if (statusCode === 429) {
+			const fallbackSummary = buildFallbackInsight({ projectKey, filters, kpis, rows });
+			return res.json({
+				summary: fallbackSummary,
+				model: "rule-based-fallback",
+				warning: "OpenAI quota exceeded; fallback insight generated.",
+			});
+		}
+
+		return res.status(500).json({
+			error: "Failed to generate AI insights",
+			details: error.response?.data || error.message,
 		});
 	}
 });

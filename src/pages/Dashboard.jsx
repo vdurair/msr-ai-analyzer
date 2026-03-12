@@ -7,6 +7,7 @@ import AiSummaryBox from "../components/ai/AiSummaryBox";
 import MsrTable from "../components/tables/MsrTable";
 import KpiCard from "../components/kpis/KpiCard";
 import useJiraData from "../hooks/useJiraData";
+import useAiInsights from "../hooks/useAiInsights";
 import "../styles/dashboard.css";
 
 const Dashboard = () => {
@@ -54,13 +55,54 @@ const Dashboard = () => {
 		const totalPoints = filteredRows.reduce((acc, row) => acc + (Number(row.points) || 0), 0);
 		const donePoints = doneRows.reduce((acc, row) => acc + (Number(row.points) || 0), 0);
 		const spilloverPoints = inProgressRows.reduce((acc, row) => acc + (Number(row.points) || 0), 0);
+		const hasStoryPoints = totalPoints > 0;
+		const totalIssueCount = filteredRows.length;
+		const doneIssueCount = doneRows.length;
+		const inProgressIssueCount = inProgressRows.length;
 
 		return {
-			velocity: donePoints,
-			commitmentReliability: `${Math.round((donePoints / Math.max(totalPoints, 1)) * 100)} %`,
-			spillover: `${Math.round((spilloverPoints / Math.max(totalPoints, 1)) * 100)} %`,
+			velocity: hasStoryPoints ? donePoints : doneIssueCount,
+			commitmentReliability: hasStoryPoints
+				? `${Math.round((donePoints / Math.max(totalPoints, 1)) * 100)} %`
+				: `${Math.round((doneIssueCount / Math.max(totalIssueCount, 1)) * 100)} %`,
+			spillover: hasStoryPoints
+				? `${Math.round((spilloverPoints / Math.max(totalPoints, 1)) * 100)} %`
+				: `${Math.round((inProgressIssueCount / Math.max(totalIssueCount, 1)) * 100)} %`,
 		};
 	}, [filteredRows]);
+
+	const issueTypePieData = useMemo(() => {
+		const counts = filteredRows.reduce((acc, row) => {
+			const issueType = row.issueType || "Other";
+			acc[issueType] = (acc[issueType] || 0) + 1;
+			return acc;
+		}, {});
+
+		return Object.entries(counts).map(([name, value]) => ({ name, value }));
+	}, [filteredRows]);
+
+	const aiFilters = useMemo(
+		() => ({
+			channel: channelFilter,
+			team: teamFilter,
+			train: trainFilter,
+		}),
+		[channelFilter, teamFilter, trainFilter]
+	);
+
+	const { summary: aiSummary, loading: aiLoading, error: aiError } = useAiInsights({
+		projectKey,
+		filters: aiFilters,
+		rows: filteredRows,
+		kpis: filteredKpis,
+		blocked: loading || Boolean(error),
+	});
+
+	const renderedAiSummary = aiLoading
+		? "Generating AI insights..."
+		: aiError
+			? `AI insights unavailable: ${aiError}`
+			: aiSummary;
 
 	return (
 		<div className="dashboard-root">
@@ -101,10 +143,10 @@ const Dashboard = () => {
 						<VelocityChart />
 					</div>
 					<div className="dashboard-chart">
-						<StoryTypePie />
+						<StoryTypePie data={issueTypePieData} />
 					</div>
 					<div className="dashboard-ai-summary">
-						<AiSummaryBox summary="Train A achieved strong velocity with high commitment reliability. Spillover was minimal, but the defect ratio needs attention." />
+						<AiSummaryBox summary={renderedAiSummary} />
 					</div>
 				</div>
 				<div className="dashboard-table-row">
@@ -113,7 +155,7 @@ const Dashboard = () => {
 						<MsrTable rows={filteredRows} loading={loading} error={error} />
 					</div>
 					<div className="dashboard-ai-summary">
-						<AiSummaryBox summary="Train A achieved strong velocity with high commitment reliability. Spillover was minimal, but the defect ratio needs attention." />
+						<AiSummaryBox summary={renderedAiSummary} />
 					</div>
 				</div>
 			</div>

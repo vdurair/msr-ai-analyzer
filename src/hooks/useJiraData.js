@@ -49,6 +49,7 @@ const useJiraData = (projectKey) => {
 		() =>
 			issues.map((issue) => ({
 				story: issue.story,
+				issueType: issue.issueType || "Other",
 				status: issue.status,
 				points: issue.points,
 				assignee: issue.assignee,

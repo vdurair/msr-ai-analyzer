@@ -1,14 +1,14 @@
 import React from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 
-const data = [
-	{ name: "Story", value: 60 },
-	{ name: "Bug", value: 25 },
-	{ name: "Task", value: 15 },
-];
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28"];
 
-const StoryTypePie = () => (
+const StoryTypePie = ({ data }) => {
+	if (!data.length) {
+		return <div className="chart-empty">No issue type data</div>;
+	}
+
+	return (
 	<ResponsiveContainer width="100%" height={180}>
 		<PieChart>
 			<Pie
@@ -29,5 +29,6 @@ const StoryTypePie = () => (
 		</PieChart>
 	</ResponsiveContainer>
 );
+};
 
 export default StoryTypePie;
